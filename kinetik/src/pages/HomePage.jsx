@@ -1,31 +1,64 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { getTrendingAnime, getPopularAnime, getSeasonalAnime, searchAnime } from '../api/anilist';
+import { getTrendingAnime, getPopularAnime, getSeasonalAnime } from '../api/anilist';
 import AnimeCard from '../components/AnimeCard';
+
+function SkeletonCard() {
+  return (
+    <div className="rounded-lg overflow-hidden bg-gray-900 animate-pulse">
+      <div className="w-full aspect-[3/4] bg-gray-800" />
+      <div className="p-2 space-y-2">
+        <div className="h-3 bg-gray-800 rounded w-3/4" />
+        <div className="h-3 bg-gray-800 rounded w-1/2" />
+      </div>
+    </div>
+  );
+}
+
+function SkeletonRow() {
+  return (
+    <div className="mb-12">
+      <div className="h-5 bg-gray-800 rounded w-40 mb-4 animate-pulse" />
+      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
+        {Array.from({ length: 12 }).map((_, i) => <SkeletonCard key={i} />)}
+      </div>
+    </div>
+  );
+}
 
 export default function HomePage() {
   const [trending, setTrending] = useState([]);
   const [popular, setPopular] = useState([]);
   const [seasonal, setSeasonal] = useState([]);
-  const [loading, setLoading] = useState(true);
   const [heroAnime, setHeroAnime] = useState(null);
+  const [trendingLoaded, setTrendingLoaded] = useState(false);
+  const [popularLoaded, setPopularLoaded] = useState(false);
+  const [seasonalLoaded, setSeasonalLoaded] = useState(false);
   const navigate = useNavigate();
 
+  // Load each section independently so they pop in as they arrive
   useEffect(() => {
-    Promise.all([getTrendingAnime(), getPopularAnime(), getSeasonalAnime()])
-      .then(([t, p, s]) => {
-        setTrending(t);
-        setPopular(p);
-        setSeasonal(s);
-        setHeroAnime(t[0]);
-        setLoading(false);
-      });
+    getTrendingAnime().then((data) => {
+      setTrending(data);
+      setHeroAnime(data[0]);
+      setTrendingLoaded(true);
+    }).catch(() => setTrendingLoaded(true));
+
+    getPopularAnime().then((data) => {
+      setPopular(data);
+      setPopularLoaded(true);
+    }).catch(() => setPopularLoaded(true));
+
+    getSeasonalAnime().then((data) => {
+      setSeasonal(data);
+      setSeasonalLoaded(true);
+    }).catch(() => setSeasonalLoaded(true));
   }, []);
 
   return (
     <div className="min-h-screen bg-black text-white">
       {/* Hero Banner */}
-      {heroAnime && (
+      {heroAnime ? (
         <div className="relative w-full h-[70vh] overflow-hidden">
           <img
             src={heroAnime.coverImage?.large}
@@ -55,25 +88,31 @@ export default function HomePage() {
             </button>
           </div>
         </div>
+      ) : (
+        // Hero skeleton
+        <div className="w-full h-[70vh] bg-gray-900 animate-pulse" />
       )}
 
       {/* Content Sections */}
       <div className="px-6 md:px-16 py-10 -mt-6 relative z-10">
-        {loading ? (
-          <div className="text-center text-gray-500 py-20">Loading...</div>
-        ) : (
-          <>
-            <Section title="🔥 Trending Now" anime={trending} />
-            <Section title="🌸 This Season" anime={seasonal} />
-            <Section title="⭐ Most Popular" anime={popular} />
-          </>
-        )}
+        {trendingLoaded
+          ? <Section title="🔥 Trending Now" anime={trending} />
+          : <SkeletonRow />}
+
+        {seasonalLoaded
+          ? <Section title="🌸 This Season" anime={seasonal} />
+          : <SkeletonRow />}
+
+        {popularLoaded
+          ? <Section title="⭐ Most Popular" anime={popular} />
+          : <SkeletonRow />}
       </div>
     </div>
   );
 }
 
 function Section({ title, anime }) {
+  if (!anime.length) return null;
   return (
     <div className="mb-12">
       <h2 className="text-lg font-bold mb-4 text-white flex items-center gap-2">
