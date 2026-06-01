@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { getTrendingAnime, getPopularAnime, getSeasonalAnime } from '../api/anilist';
+import { getHomepageData } from '../api/anilist';
 import AnimeCard from '../components/AnimeCard';
 
 function SkeletonCard() {
@@ -30,30 +30,21 @@ export default function HomePage() {
   const [trending, setTrending] = useState([]);
   const [popular, setPopular] = useState([]);
   const [seasonal, setSeasonal] = useState([]);
-  const [heroAnime, setHeroAnime] = useState(null);
-  const [trendingLoaded, setTrendingLoaded] = useState(false);
-  const [popularLoaded, setPopularLoaded] = useState(false);
-  const [seasonalLoaded, setSeasonalLoaded] = useState(false);
+  const [loaded, setLoaded] = useState(false);
   const navigate = useNavigate();
 
-  // Load each section independently so they pop in as they arrive
   useEffect(() => {
-    getTrendingAnime().then((data) => {
-      setTrending(data);
-      setHeroAnime(data[0]);
-      setTrendingLoaded(true);
-    }).catch(() => setTrendingLoaded(true));
-
-    getPopularAnime().then((data) => {
-      setPopular(data);
-      setPopularLoaded(true);
-    }).catch(() => setPopularLoaded(true));
-
-    getSeasonalAnime().then((data) => {
-      setSeasonal(data);
-      setSeasonalLoaded(true);
-    }).catch(() => setSeasonalLoaded(true));
+    getHomepageData()
+      .then(({ trending, popular, seasonal }) => {
+        setTrending(trending);
+        setPopular(popular);
+        setSeasonal(seasonal);
+        setLoaded(true);
+      })
+      .catch(() => setLoaded(true));
   }, []);
+
+  const heroAnime = trending[0];
 
   return (
     <div className="min-h-screen bg-black text-white">
@@ -89,23 +80,24 @@ export default function HomePage() {
           </div>
         </div>
       ) : (
-        // Hero skeleton
         <div className="w-full h-[70vh] bg-gray-900 animate-pulse" />
       )}
 
       {/* Content Sections */}
       <div className="px-6 md:px-16 py-10 -mt-6 relative z-10">
-        {trendingLoaded
-          ? <Section title="🔥 Trending Now" anime={trending} />
-          : <SkeletonRow />}
-
-        {seasonalLoaded
-          ? <Section title="🌸 This Season" anime={seasonal} />
-          : <SkeletonRow />}
-
-        {popularLoaded
-          ? <Section title="⭐ Most Popular" anime={popular} />
-          : <SkeletonRow />}
+        {!loaded ? (
+          <>
+            <SkeletonRow />
+            <SkeletonRow />
+            <SkeletonRow />
+          </>
+        ) : (
+          <>
+            <Section title="🔥 Trending Now" anime={trending} />
+            <Section title="🌸 This Season" anime={seasonal} />
+            <Section title="⭐ Most Popular" anime={popular} />
+          </>
+        )}
       </div>
     </div>
   );

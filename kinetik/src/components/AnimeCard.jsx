@@ -1,5 +1,6 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
+import { prefetchAnime } from '../api/anilist';
 
 export default function AnimeCard({ anime }) {
   const navigate = useNavigate();
@@ -7,12 +8,14 @@ export default function AnimeCard({ anime }) {
   return (
     <div
       onClick={() => navigate(`/anime/${anime.id}`)}
+      onMouseEnter={() => prefetchAnime(anime.id)}
       className="cursor-pointer group rounded-lg overflow-hidden bg-gray-900 hover:scale-105 hover:shadow-lg hover:shadow-blue-900/40 transition-all duration-200"
     >
       <div className="relative">
         <img
           src={anime.coverImage?.large}
           alt={anime.title?.romaji}
+          loading="lazy"
           className="w-full aspect-[3/4] object-cover group-hover:brightness-110 transition-all"
         />
         {anime.averageScore && (
