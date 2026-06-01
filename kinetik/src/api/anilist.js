@@ -1,14 +1,12 @@
 const ANILIST_URL = 'https://graphql.anilist.co';
 
-// In-memory cache with TTL (5 minutes)
+// In-memory cache with 5-minute TTL
 const cache = new Map();
 const CACHE_TTL = 5 * 60 * 1000;
 
 async function cachedFetch(key, fetchFn) {
   const cached = cache.get(key);
-  if (cached && Date.now() - cached.ts < CACHE_TTL) {
-    return cached.data;
-  }
+  if (cached && Date.now() - cached.ts < CACHE_TTL) return cached.data;
   const data = await fetchFn();
   cache.set(key, { data, ts: Date.now() });
   return data;
@@ -24,67 +22,60 @@ async function gql(query, variables = {}) {
   return json.data;
 }
 
-const MEDIA_FIELDS = `
-  id
-  title { romaji english }
-  episodes
-  status
-  coverImage { large }
-  averageScore
-  genres
+const CARD_FIELDS = `
+  id title { romaji english } episodes status
+  coverImage { large medium } averageScore genres
+  format nextAiringEpisode { episode }
 `;
 
-const MEDIA_FIELDS_FULL = `
-  id
-  title { romaji english }
-  episodes
-  status
-  coverImage { large extraLarge }
-  bannerImage
-  description
-  genres
-  averageScore
-  season
-  seasonYear
-  studios { nodes { name } }
+const HERO_FIELDS = `
+  id title { romaji english } episodes status description
+  coverImage { large extraLarge } bannerImage averageScore genres
+  startDate { year month day } endDate { year month day }
+  format nextAiringEpisode { episode }
 `;
 
-export async function getTrendingAnime() {
-  return cachedFetch('trending', async () => {
+export async function getHomepageData() {
+  return cachedFetch('homepage', async () => {
     const data = await gql(`
       query {
-        Page(page: 1, perPage: 20) {
-          media(type: ANIME, sort: TRENDING_DESC, status: RELEASING) { ${MEDIA_FIELDS} }
+        hero: Page(page: 1, perPage: 10) {
+          media(type: ANIME, sort: TRENDING_DESC, status: RELEASING) { ${HERO_FIELDS} }
+        }
+        latest: Page(page: 1, perPage: 12) {
+          media(type: ANIME, sort: UPDATED_AT_DESC, status: RELEASING) { ${CARD_FIELDS} }
+        }
+        latestSub: Page(page: 1, perPage: 12) {
+          media(type: ANIME, sort: UPDATED_AT_DESC, status: RELEASING, isAdult: false) { ${CARD_FIELDS} }
+        }
+        latestDub: Page(page: 1, perPage: 12) {
+          media(type: ANIME, sort: POPULARITY_DESC, status: RELEASING) { ${CARD_FIELDS} }
+        }
+        upcoming: Page(page: 1, perPage: 12) {
+          media(type: ANIME, sort: START_DATE, status: NOT_YET_RELEASED) { ${CARD_FIELDS} }
+        }
+        newRelease: Page(page: 1, perPage: 5) {
+          media(type: ANIME, sort: START_DATE_DESC) { ${CARD_FIELDS} }
+        }
+        topDay: Page(page: 1, perPage: 10) {
+          media(type: ANIME, sort: TRENDING_DESC, status: RELEASING) { ${CARD_FIELDS} }
+        }
+        topWeek: Page(page: 1, perPage: 10) {
+          media(type: ANIME, sort: POPULARITY_DESC, status: RELEASING) { ${CARD_FIELDS} }
+        }
+        topMonth: Page(page: 1, perPage: 10) {
+          media(type: ANIME, sort: SCORE_DESC) { ${CARD_FIELDS} }
         }
       }
     `);
-    return data.Page.media;
-  });
-}
 
-export async function getPopularAnime() {
-  return cachedFetch('popular', async () => {
-    const data = await gql(`
-      query {
-        Page(page: 1, perPage: 20) {
-          media(type: ANIME, sort: POPULARITY_DESC) { ${MEDIA_FIELDS} }
-        }
-      }
-    `);
-    return data.Page.media;
-  });
-}
-
-export async function getSeasonalAnime() {
-  return cachedFetch('seasonal', async () => {
-    const data = await gql(`
-      query {
-        Page(page: 1, perPage: 20) {
-          media(type: ANIME, sort: POPULARITY_DESC, season: SPRING, seasonYear: 2026) { ${MEDIA_FIELDS} }
-        }
-      }
-    `);
-    return data.Page.media;
+    return {
+      hero: data.hero.media,
+      latest: { all: data.latest.media, sub: data.latestSub.media, dub: data.latestDub.media },
+      upcoming: data.upcoming.media,
+      newRelease: data.newRelease.media,
+      top: { day: data.topDay.media, week: data.topWeek.media, month: data.topMonth.media },
+    };
   });
 }
 
@@ -92,8 +83,8 @@ export async function searchAnime(query) {
   return cachedFetch(`search:${query}`, async () => {
     const data = await gql(`
       query ($search: String) {
-        Page(page: 1, perPage: 20) {
-          media(search: $search, type: ANIME, sort: POPULARITY_DESC) { ${MEDIA_FIELDS} }
+        Page(page: 1, perPage: 30) {
+          media(search: $search, type: ANIME, sort: POPULARITY_DESC) { ${CARD_FIELDS} }
         }
       }
     `, { search: query });
@@ -105,56 +96,27 @@ export async function getAnimeById(id) {
   return cachedFetch(`anime:${id}`, async () => {
     const data = await gql(`
       query ($id: Int) {
-        Media(id: $id, type: ANIME) { ${MEDIA_FIELDS_FULL} }
+        Media(id: $id, type: ANIME) {
+          ${HERO_FIELDS}
+          studios { nodes { name } }
+          seasonYear season
+        }
       }
     `, { id });
     return data.Media;
   });
 }
 
-// Batch fetch all homepage data in ONE request
-export async function getHomepageData() {
-  return cachedFetch('homepage', async () => {
-    const data = await gql(`
-      query {
-        trending: Page(page: 1, perPage: 20) {
-          media(type: ANIME, sort: TRENDING_DESC, status: RELEASING) { ${MEDIA_FIELDS} }
-        }
-        popular: Page(page: 1, perPage: 20) {
-          media(type: ANIME, sort: POPULARITY_DESC) { ${MEDIA_FIELDS} }
-        }
-        seasonal: Page(page: 1, perPage: 20) {
-          media(type: ANIME, sort: POPULARITY_DESC, season: SPRING, seasonYear: 2026) { ${MEDIA_FIELDS} }
-        }
-      }
-    `);
-
-    // Warm individual caches too so anime page loads are instant
-    [...data.trending.media, ...data.popular.media, ...data.seasonal.media].forEach((anime) => {
-      if (!cache.has(`anime:${anime.id}`)) {
-        cache.set(`anime:${anime.id}`, { data: anime, ts: Date.now() });
-      }
-    });
-
-    return {
-      trending: data.trending.media,
-      popular: data.popular.media,
-      seasonal: data.seasonal.media,
-    };
-  });
-}
-
-// Prefetch an anime detail page in the background (call on hover)
 export function prefetchAnime(id) {
-  if (!cache.has(`anime:${id}`)) {
-    getAnimeById(id);
-  }
+  if (!cache.has(`anime:${id}`)) getAnimeById(id);
 }
 
 export function toSlug(title) {
   return (title?.english || title?.romaji || '')
-    .toLowerCase()
-    .replace(/[^a-z0-9\s-]/g, '')
-    .replace(/\s+/g, '-')
-    .trim();
+    .toLowerCase().replace(/[^a-z0-9\s-]/g, '').replace(/\s+/g, '-').trim();
+}
+
+export function formatDate(dateObj) {
+  if (!dateObj?.year) return '?';
+  return `${dateObj.year}-${String(dateObj.month).padStart(2,'0')}-${String(dateObj.day).padStart(2,'0')}`;
 }
