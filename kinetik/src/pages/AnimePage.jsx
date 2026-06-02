@@ -56,12 +56,10 @@ export default function AnimePage() {
             <h1 className="text-2xl font-black mb-1">{anime.title?.english || anime.title?.romaji}</h1>
             {anime.title?.english && <p className="text-gray-500 text-sm mb-2">{anime.title?.romaji}</p>}
             <div className="flex gap-2 flex-wrap mb-3">
-              <span className="bg-white/10 text-xs px-2 py-0.5 rounded">PG-13</span>
               <span className="bg-white/10 text-xs px-2 py-0.5 rounded">HD</span>
-              <span className="bg-white/10 text-xs px-2 py-0.5 rounded">CC</span>
               {anime.startDate?.year && (
                 <span className="text-gray-400 text-xs self-center">
-                  {formatDate(anime.startDate)} to {anime.endDate?.year ? formatDate(anime.endDate) : '?'}
+                  {formatDate(anime.startDate)} to {anime.endDate?.year ? formatDate(anime.endDate) : 'Ongoing'}
                 </span>
               )}
             </div>
@@ -81,10 +79,19 @@ export default function AnimePage() {
         <div className="flex flex-col lg:flex-row gap-5">
           <div className="flex-1 min-w-0">
             <p className="text-gray-400 text-xs mb-2">▶ Now playing: Episode {selectedEpisode}</p>
-            <EpisodeServers animeSlug={animeSlug} episode={selectedEpisode} anilistId={anime.id} />
+            <EpisodeServers
+              animeSlug={animeSlug}
+              episode={selectedEpisode}
+              anilistId={anime.id}
+              malId={anime.idMal}
+            />
           </div>
           <div className="w-full lg:w-72 flex-shrink-0">
-            <EpisodeList totalEpisodes={totalEpisodes} selectedEpisode={selectedEpisode} onEpisodeSelect={setSelectedEpisode} />
+            <EpisodeList
+              totalEpisodes={totalEpisodes}
+              selectedEpisode={selectedEpisode}
+              onEpisodeSelect={setSelectedEpisode}
+            />
           </div>
         </div>
       </div>

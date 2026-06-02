@@ -23,13 +23,13 @@ async function gql(query, variables = {}) {
 }
 
 const CARD_FIELDS = `
-  id title { romaji english } episodes status
+  id idMal title { romaji english } episodes status
   coverImage { large medium } averageScore genres
   format nextAiringEpisode { episode }
 `;
 
 const HERO_FIELDS = `
-  id title { romaji english } episodes status description
+  id idMal title { romaji english } episodes status description
   coverImage { large extraLarge } bannerImage averageScore genres
   startDate { year month day } endDate { year month day }
   format nextAiringEpisode { episode }

@@ -1,34 +1,43 @@
 import React, { useState, useEffect } from 'react';
 
-export default function EpisodeServers({ animeSlug, episode, anilistId }) {
-  // Only sources confirmed to NOT block iframes (no X-Frame-Options: DENY/SAMEORIGIN)
+// animeSlug = gogoanime-style slug (e.g. "naruto")
+// episode   = episode number (e.g. 1)
+// anilistId = AniList numeric ID
+// malId     = MyAnimeList numeric ID (different from AniList!)
+export default function EpisodeServers({ animeSlug, episode, anilistId, malId }) {
+  // Use MAL ID where needed — it's what most embed services index by.
+  // Fall back to anilistId if malId is missing (they're often the same for older shows).
+  const id = malId || anilistId;
+
   const SERVERS = {
     SUB: [
       {
         name: 'VidLink',
-        getUrl: () => `https://vidlink.pro/anime/${anilistId}/${episode}/1`,
+        // vidlink uses MAL ID: /anime/[malId]/[episode]/1 (1=sub, 2=dub)
+        getUrl: () => `https://vidlink.pro/anime/${id}/${episode}/1`,
       },
       {
         name: '2Embed',
-        getUrl: () => `https://2embed.skin/embed/anime?id=${anilistId}&ep=${episode}`,
+        getUrl: () => `https://2embed.skin/embed/anime?id=${id}&ep=${episode}`,
       },
       {
-        name: 'VidSrc Pro',
-        getUrl: () => `https://vidsrc.pro/embed/anime/${anilistId}/1/${episode}`,
+        name: 'NontonGo',
+        // Uses gogoanime-style slug: animeSlug-episode-N
+        getUrl: () => `https://www.nontongo.win/embed/anime/${animeSlug}-episode-${episode}`,
       },
       {
-        name: 'EmbedSu',
-        getUrl: () => `https://embed.su/embed/anime/${anilistId}/1/${episode}`,
+        name: 'GogoPlay',
+        getUrl: () => `https://gogoanime.hu/streaming.php?id=${animeSlug}-episode-${episode}`,
       },
     ],
     DUB: [
       {
         name: 'VidLink',
-        getUrl: () => `https://vidlink.pro/anime/${anilistId}/${episode}/2`,
+        getUrl: () => `https://vidlink.pro/anime/${id}/${episode}/2`,
       },
       {
         name: '2Embed',
-        getUrl: () => `https://2embed.skin/embed/anime?id=${anilistId}&ep=${episode}&dub=1`,
+        getUrl: () => `https://2embed.skin/embed/anime?id=${id}&ep=${episode}&dub=1`,
       },
     ],
   };
@@ -37,14 +46,12 @@ export default function EpisodeServers({ animeSlug, episode, anilistId }) {
   const [activeServer, setActiveServer] = useState(0);
   const [iframeKey, setIframeKey] = useState(0);
 
-  // Reset to first server when episode changes
   useEffect(() => {
     setActiveServer(0);
     setActiveType('SUB');
     setIframeKey((k) => k + 1);
   }, [episode]);
 
-  // Refresh iframe when server changes
   useEffect(() => {
     setIframeKey((k) => k + 1);
   }, [activeType, activeServer]);
@@ -72,13 +79,14 @@ export default function EpisodeServers({ animeSlug, episode, anilistId }) {
           allowFullScreen
           allow="autoplay; fullscreen; picture-in-picture; encrypted-media"
           referrerPolicy="no-referrer-when-downgrade"
+          sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-presentation"
         />
       </div>
 
-      {/* Info bar */}
+      {/* Tip */}
       <div className="mt-2 bg-blue-900/20 border border-blue-700/30 text-blue-300 text-xs px-3 py-2 rounded-lg flex items-center gap-2">
         <span>💡</span>
-        <span>If a server doesn't load, try the next one. VidLink usually works best.</span>
+        <span>VidLink works best. If a server shows a blank screen, try the next one.</span>
       </div>
 
       {/* Server Selector */}
@@ -90,10 +98,7 @@ export default function EpisodeServers({ animeSlug, episode, anilistId }) {
               {servers.map((server, i) => (
                 <button
                   key={i}
-                  onClick={() => {
-                    setActiveType(type);
-                    setActiveServer(i);
-                  }}
+                  onClick={() => { setActiveType(type); setActiveServer(i); }}
                   className={`px-3 py-1.5 rounded text-xs font-medium transition-all ${
                     activeType === type && activeServer === i
                       ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/30'
