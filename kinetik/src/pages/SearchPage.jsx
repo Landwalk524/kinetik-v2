@@ -1,19 +1,25 @@
 import React, { useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { searchAnime } from '../api/anilist';
+import { searchAnime } from '../api/jikan';
+import { normalizeAnime } from './HomePage';
 import AnimeCard from '../components/AnimeCard';
 
 export default function SearchPage() {
   const [searchParams] = useSearchParams();
   const query = searchParams.get('q') || '';
   const [results, setResults] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    if (query) {
-      setLoading(true);
-      searchAnime(query).then((data) => { setResults(data); setLoading(false); });
-    }
+    if (!query) return;
+    setLoading(true);
+    searchAnime(query)
+      .then((data) => {
+        const arr = Array.isArray(data) ? data : (data?.data ?? []);
+        setResults(arr.map(normalizeAnime));
+        setLoading(false);
+      })
+      .catch(() => setLoading(false));
   }, [query]);
 
   return (

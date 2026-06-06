@@ -1,43 +1,39 @@
 import React, { useState, useEffect } from 'react';
 
-// animeSlug = gogoanime-style slug (e.g. "naruto")
-// episode   = episode number (e.g. 1)
-// anilistId = AniList numeric ID
-// malId     = MyAnimeList numeric ID (different from AniList!)
-export default function EpisodeServers({ animeSlug, episode, anilistId, malId }) {
-  // Use MAL ID where needed — it's what most embed services index by.
-  // Fall back to anilistId if malId is missing (they're often the same for older shows).
-  const id = malId || anilistId;
-
+/**
+ * EpisodeServers
+ * 
+ * Props:
+ *   malId    — MyAnimeList numeric ID (e.g. 38000 for Demon Slayer)
+ *   episode  — episode number (1-based integer)
+ *   slug     — gogoanime-style slug (e.g. "demon-slayer-kimetsu-no-yaiba")
+ */
+export default function EpisodeServers({ malId, episode, slug }) {
+  // VidLink URL: /anime/[MAL_ID]/[EP_NUM]/[1=sub, 2=dub]
+  // No sandbox attribute — some players actively block sandboxed iframes
   const SERVERS = {
     SUB: [
       {
         name: 'VidLink',
-        // vidlink uses MAL ID: /anime/[malId]/[episode]/1 (1=sub, 2=dub)
-        getUrl: () => `https://vidlink.pro/anime/${id}/${episode}/1`,
+        getUrl: () => `https://vidlink.pro/anime/${malId}/${episode}/1`,
       },
       {
         name: '2Embed',
-        getUrl: () => `https://2embed.skin/embed/anime?id=${id}&ep=${episode}`,
+        getUrl: () => `https://2embed.skin/embed/anime?id=${malId}&ep=${episode}`,
       },
       {
-        name: 'NontonGo',
-        // Uses gogoanime-style slug: animeSlug-episode-N
-        getUrl: () => `https://www.nontongo.win/embed/anime/${animeSlug}-episode-${episode}`,
-      },
-      {
-        name: 'GogoPlay',
-        getUrl: () => `https://gogoanime.hu/streaming.php?id=${animeSlug}-episode-${episode}`,
+        name: 'Anime.js',
+        getUrl: () => `https://player.smashy.stream/anime/${malId}?ep=${episode}`,
       },
     ],
     DUB: [
       {
         name: 'VidLink',
-        getUrl: () => `https://vidlink.pro/anime/${id}/${episode}/2`,
+        getUrl: () => `https://vidlink.pro/anime/${malId}/${episode}/2`,
       },
       {
         name: '2Embed',
-        getUrl: () => `https://2embed.skin/embed/anime?id=${id}&ep=${episode}&dub=1`,
+        getUrl: () => `https://2embed.skin/embed/anime?id=${malId}&ep=${episode}&dub=1`,
       },
     ],
   };
@@ -46,63 +42,46 @@ export default function EpisodeServers({ animeSlug, episode, anilistId, malId })
   const [activeServer, setActiveServer] = useState(0);
   const [iframeKey, setIframeKey] = useState(0);
 
+  // Reset on episode change
   useEffect(() => {
-    setActiveServer(0);
     setActiveType('SUB');
+    setActiveServer(0);
     setIframeKey((k) => k + 1);
-  }, [episode]);
-
-  useEffect(() => {
-    setIframeKey((k) => k + 1);
-  }, [activeType, activeServer]);
+  }, [episode, malId]);
 
   const currentUrl = SERVERS[activeType][activeServer].getUrl();
 
   return (
     <div className="w-full">
-      {/* Player */}
-      <div
-        className="relative w-full bg-black rounded-lg overflow-hidden"
-        style={{ paddingBottom: '56.25%' }}
-      >
+      {/* 16:9 Player */}
+      <div className="relative w-full bg-black rounded-xl overflow-hidden" style={{ paddingBottom: '56.25%' }}>
         <iframe
           key={iframeKey}
           src={currentUrl}
-          style={{
-            position: 'absolute',
-            top: 0,
-            left: 0,
-            width: '100%',
-            height: '100%',
-            border: 'none',
-          }}
+          style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', border: 'none' }}
           allowFullScreen
           allow="autoplay; fullscreen; picture-in-picture; encrypted-media"
           referrerPolicy="no-referrer-when-downgrade"
-          sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-presentation"
+          // NOTE: NO sandbox attribute — embed players actively detect and block sandboxed iframes
         />
       </div>
 
-      {/* Tip */}
-      <div className="mt-2 bg-blue-900/20 border border-blue-700/30 text-blue-300 text-xs px-3 py-2 rounded-lg flex items-center gap-2">
-        <span>💡</span>
-        <span>VidLink works best. If a server shows a blank screen, try the next one.</span>
-      </div>
-
-      {/* Server Selector */}
-      <div className="mt-2 bg-[#111d2b] rounded-lg">
+      {/* Server selector */}
+      <div className="mt-3 bg-[#111d2b] rounded-xl overflow-hidden">
         {Object.entries(SERVERS).map(([type, servers]) => (
-          <div key={type} className="flex items-center gap-4 px-4 py-3 border-b border-white/5 last:border-b-0">
-            <span className="text-gray-400 text-xs font-bold w-10 flex-shrink-0">{type}</span>
+          <div key={type} className="flex items-center gap-3 px-4 py-3 border-b border-white/5 last:border-b-0">
+            <span className={`text-xs font-bold w-9 flex-shrink-0 ${type === 'DUB' ? 'text-yellow-400' : 'text-blue-400'}`}>
+              {type}
+            </span>
             <div className="flex gap-2 flex-wrap">
               {servers.map((server, i) => (
                 <button
                   key={i}
                   onClick={() => { setActiveType(type); setActiveServer(i); }}
-                  className={`px-3 py-1.5 rounded text-xs font-medium transition-all ${
+                  className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
                     activeType === type && activeServer === i
-                      ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/30'
-                      : 'bg-[#1a2535] text-gray-300 hover:bg-[#223048] border border-white/10'
+                      ? 'bg-blue-600 text-white'
+                      : 'bg-[#1a2535] text-gray-400 hover:text-white hover:bg-[#223048] border border-white/10'
                   }`}
                 >
                   ▶ {server.name}
@@ -112,6 +91,10 @@ export default function EpisodeServers({ animeSlug, episode, anilistId, malId })
           </div>
         ))}
       </div>
+
+      <p className="mt-2 text-gray-600 text-xs text-center">
+        If a player doesn't load, try the next server.
+      </p>
     </div>
   );
 }

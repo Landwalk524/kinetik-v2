@@ -1,25 +1,8 @@
 import React, { useEffect, useState } from 'react';
-import { getHomepageData } from '../api/anilist';
+import { getHomepageData, getCover, getTitle } from '../api/jikan';
 import HeroSlider from '../components/HeroSlider';
-import LatestEpisodes from '../components/LatestEpisodes';
 import AnimeCard from '../components/AnimeCard';
-import AnimeListRow from '../components/AnimeListRow';
 import Sidebar from '../components/Sidebar';
-
-function SectionBlock({ title, anime }) {
-  if (!anime?.length) return null;
-  return (
-    <div className="bg-[#111d2b] rounded-lg overflow-hidden mb-4">
-      <div className="px-4 py-3 border-b border-white/5 flex items-center gap-2">
-        <span className="w-1.5 h-4 bg-blue-500 rounded-full inline-block" />
-        <h3 className="text-white font-bold text-sm uppercase tracking-wide">{title}</h3>
-      </div>
-      <div className="px-2 py-2 divide-y divide-white/5">
-        {anime.slice(0, 6).map((a) => <AnimeListRow key={a.id} anime={a} />)}
-      </div>
-    </div>
-  );
-}
 
 function SkeletonGrid() {
   return (
@@ -38,11 +21,45 @@ function SkeletonGrid() {
 
 const ALPHABET = ['#', '0-9', ...Array.from({ length: 26 }, (_, i) => String.fromCharCode(65 + i))];
 
+// Normalize a Jikan anime to what AnimeCard/HeroSlider expect
+export function normalizeAnime(a) {
+  if (!a) return null;
+  return {
+    id: a.mal_id,
+    mal_id: a.mal_id,
+    title: { english: a.title_english || a.title, romaji: a.title },
+    coverImage: { large: getCover(a), extraLarge: getCover(a) },
+    bannerImage: getCover(a),
+    episodes: a.episodes,
+    status: a.status,
+    genres: (a.genres || []).map(g => g.name),
+    averageScore: a.score ? Math.round(a.score * 10) : null,
+    description: a.synopsis,
+    format: a.type,
+    score: a.score,
+  };
+}
+
 export default function HomePage() {
   const [data, setData] = useState(null);
 
   useEffect(() => {
-    getHomepageData().then(setData).catch(console.error);
+    getHomepageData()
+      .then((raw) => {
+        const normalize = (arr) => (arr || []).filter(Boolean).map(normalizeAnime);
+        setData({
+          hero: normalize(raw.airing).slice(0, 8),
+          latest: normalize(raw.seasonal),
+          upcoming: normalize(raw.upcoming),
+          top: {
+            day: normalize(raw.popular).slice(0, 10),
+            week: normalize(raw.popular).slice(0, 10),
+            month: normalize(raw.airing).slice(0, 10),
+          },
+          newRelease: normalize(raw.seasonal).slice(0, 5),
+        });
+      })
+      .catch(console.error);
   }, []);
 
   return (
@@ -50,50 +67,45 @@ export default function HomePage() {
       {/* Hero */}
       <HeroSlider slides={data?.hero} />
 
-      {/* Share bar */}
+      {/* Banner */}
       <div className="bg-[#0f1824] border-y border-white/5 text-center py-2.5 text-xs text-gray-500">
-        ℹ️ If you enjoy Kinetik, please consider sharing it with your friends. Thank you!
+        ℹ️ If you enjoy Kinetik, please share it with your friends!
       </div>
 
       {/* Main layout */}
       <div className="max-w-screen-xl mx-auto px-4 py-6 flex flex-col lg:flex-row gap-6">
-        {/* Left content */}
         <main className="flex-1 min-w-0">
-          {/* Latest Episodes */}
+
+          {/* Currently Airing */}
           <div className="mb-8">
-            <div className="mb-3">
-              {!data ? (
-                <SkeletonGrid />
-              ) : (
-                <LatestEpisodes latest={data?.latest} />
-              )}
+            <div className="flex items-center justify-between mb-3">
+              <h2 className="text-white font-bold text-base">Currently Airing</h2>
             </div>
+            {!data ? <SkeletonGrid /> : (
+              <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 gap-3">
+                {(data.latest || []).map((a) => <AnimeCard key={a.id} anime={a} />)}
+              </div>
+            )}
           </div>
 
-          {/* Upcoming Anime */}
+          {/* Upcoming */}
           <div className="mb-8">
             <div className="flex items-center justify-between mb-3">
               <h2 className="text-white font-bold text-base">Upcoming Anime</h2>
-              <a href="#" className="text-blue-400 text-xs hover:underline">View more →</a>
             </div>
-            {!data ? (
-              <SkeletonGrid />
-            ) : (
+            {!data ? <SkeletonGrid /> : (
               <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 gap-3">
                 {(data.upcoming || []).map((a) => <AnimeCard key={a.id} anime={a} />)}
               </div>
             )}
           </div>
 
-          {/* A-Z List */}
+          {/* A-Z */}
           <div className="bg-[#111d2b] rounded-lg p-4 mb-6">
             <p className="text-xs text-gray-400 mb-3">A-Z List — Search anime by alphabet</p>
             <div className="flex flex-wrap gap-1.5">
               {ALPHABET.map((letter) => (
-                <span
-                  key={letter}
-                  className="px-2.5 py-1 bg-[#1a2535] hover:bg-blue-600 text-gray-300 hover:text-white text-xs rounded cursor-pointer transition-colors font-medium"
-                >
+                <span key={letter} className="px-2.5 py-1 bg-[#1a2535] hover:bg-blue-600 text-gray-300 hover:text-white text-xs rounded cursor-pointer transition-colors font-medium">
                   {letter}
                 </span>
               ))}
@@ -101,7 +113,6 @@ export default function HomePage() {
           </div>
         </main>
 
-        {/* Sidebar */}
         <Sidebar top={data?.top} newRelease={data?.newRelease} />
       </div>
     </div>
