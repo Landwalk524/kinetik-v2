@@ -1,12 +1,19 @@
 // Jikan v4 — MyAnimeList unofficial REST API
 // Docs: https://docs.api.jikan.moe
-// Rate limit: ~3 requests/second, no auth needed
+// Rate limit: ~3 req/second — DO NOT fire parallel requests
 
 const BASE = 'https://api.jikan.moe/v4';
 
-// Simple in-memory cache (5 min TTL)
+// In-memory cache (10 min TTL)
 const cache = new Map();
-const TTL = 5 * 60 * 1000;
+const TTL = 10 * 60 * 1000;
+
+// Sequential request queue to avoid 429s
+let requestQueue = Promise.resolve();
+
+function sleep(ms) {
+  return new Promise((r) => setTimeout(r, ms));
+}
 
 async function get(path, params = {}) {
   const query = new URLSearchParams(params).toString();
@@ -15,57 +22,67 @@ async function get(path, params = {}) {
   const hit = cache.get(key);
   if (hit && Date.now() - hit.ts < TTL) return hit.data;
 
-  const res = await fetch(`${BASE}${key}`);
-  if (!res.ok) throw new Error(`Jikan ${res.status}: ${path}`);
-  const json = await res.json();
-  const data = json.data ?? json;
-  cache.set(key, { data, ts: Date.now() });
-  return data;
+  // Chain onto the queue — enforces ~400ms between requests
+  const result = await (requestQueue = requestQueue.then(async () => {
+    await sleep(400);
+    const res = await fetch(`${BASE}${path}${query ? '?' + query : ''}`);
+    if (!res.ok) {
+      if (res.status === 429) {
+        // Back off and retry once
+        await sleep(2000);
+        const retry = await fetch(`${BASE}${path}${query ? '?' + query : ''}`);
+        if (!retry.ok) throw new Error(`Jikan ${retry.status}: ${path}`);
+        const json = await retry.json();
+        return json.data ?? json;
+      }
+      throw new Error(`Jikan ${res.status}: ${path}`);
+    }
+    const json = await res.json();
+    return json.data ?? json;
+  }));
+
+  cache.set(key, { data: result, ts: Date.now() });
+  return result;
 }
 
 // ─── Anime Info ───────────────────────────────────────────────────────────────
 
-/** Full anime details by MAL ID */
 export async function getAnimeById(malId) {
   return get(`/anime/${malId}/full`);
 }
 
-/** Episode list for an anime (paginated, ~100/page) */
 export async function getEpisodes(malId, page = 1) {
   return get(`/anime/${malId}/episodes`, { page });
 }
 
 // ─── Discovery ────────────────────────────────────────────────────────────────
 
-/** Currently airing anime */
-export async function getAiring(limit = 20) {
+export async function getAiring(limit = 18) {
   return get('/top/anime', { filter: 'airing', limit });
 }
 
-/** All-time top anime */
-export async function getTopAnime(limit = 20) {
+export async function getTopAnime(limit = 10) {
   return get('/top/anime', { filter: 'bypopularity', limit });
 }
 
-/** Current season */
-export async function getSeasonNow(limit = 24) {
+export async function getSeasonNow(limit = 18) {
   const raw = await get('/seasons/now', { limit });
   return Array.isArray(raw) ? raw : (raw?.data ?? []);
 }
 
-/** Upcoming season */
 export async function getUpcoming(limit = 12) {
   return get('/top/anime', { filter: 'upcoming', limit });
 }
 
-/** Homepage bundle — runs 4 queries in parallel */
+/**
+ * Homepage bundle — SEQUENTIAL to avoid Jikan 429 rate limits.
+ * Fires one request at a time with ~400ms gap.
+ */
 export async function getHomepageData() {
-  const [airing, popular, seasonal, upcoming] = await Promise.all([
-    getAiring(16),
-    getTopAnime(10),
-    getSeasonNow(16),
-    getUpcoming(12),
-  ]);
+  const airing = await getAiring(18);
+  const popular = await getTopAnime(10);
+  const seasonal = await getSeasonNow(18);
+  const upcoming = await getUpcoming(12);
   return { airing, popular, seasonal, upcoming };
 }
 
@@ -77,7 +94,6 @@ export async function searchAnime(query, limit = 24) {
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
-/** Get the large cover image URL from a Jikan anime object */
 export function getCover(anime) {
   return (
     anime?.images?.jpg?.large_image_url ||
@@ -87,12 +103,10 @@ export function getCover(anime) {
   );
 }
 
-/** Get display title (prefer English) */
 export function getTitle(anime) {
   return anime?.title_english || anime?.title || '';
 }
 
-/** Convert Jikan anime object to a slug for gogoanime-style URLs */
 export function toSlug(anime) {
   return getTitle(anime)
     .toLowerCase()
