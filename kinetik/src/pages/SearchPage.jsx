@@ -1,7 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { searchAnime } from '../api/jikan';
-import { normalizeAnime } from './HomePage';
+import { searchAnime } from '../api/anilist';
 import AnimeCard from '../components/AnimeCard';
 
 export default function SearchPage() {
@@ -15,8 +14,8 @@ export default function SearchPage() {
     setLoading(true);
     searchAnime(query)
       .then((data) => {
-        const arr = Array.isArray(data) ? data : (data?.data ?? []);
-        setResults(arr.map(normalizeAnime));
+        const arr = Array.isArray(data) ? data : [];
+        setResults(arr);
         setLoading(false);
       })
       .catch(() => setLoading(false));
@@ -40,7 +39,7 @@ export default function SearchPage() {
         </div>
       ) : (
         <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 gap-3">
-          {results.map((a) => <AnimeCard key={a.id} anime={a} />)}
+          {results.map((a) => <AnimeCard key={a.idMal || a.id} anime={a} />)}
         </div>
       )}
     </div>

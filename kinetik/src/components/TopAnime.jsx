@@ -26,13 +26,15 @@ export default function TopAnime({ top }) {
       </div>
       <div className="divide-y divide-white/5">
         {list.slice(0, 8).map((anime, i) => {
+          const malId = anime.idMal || anime.mal_id;
+          if (!malId) return null;
           const ep = anime.nextAiringEpisode?.episode
             ? anime.nextAiringEpisode.episode - 1
             : anime.episodes;
           return (
             <div
-              key={anime.id}
-              onClick={() => navigate(`/anime/${anime.id}`)}
+              key={anime.id || malId}
+              onClick={() => navigate(`/anime/${malId}`)}
               className="flex items-center gap-3 px-4 py-3 cursor-pointer hover:bg-white/5 transition-colors"
             >
               <span className="text-2xl font-black text-blue-500/60 w-6 flex-shrink-0">{i + 1}</span>
@@ -46,7 +48,7 @@ export default function TopAnime({ top }) {
                   {anime.title?.english || anime.title?.romaji}
                 </p>
                 <div className="flex gap-2 mt-1">
-                  {ep && <span className="text-[10px] text-gray-400">CC {ep}</span>}
+                  {ep && <span className="text-[10px] text-gray-400">EP {ep}</span>}
                   <span className="text-[10px] text-gray-400">{anime.format || 'TV'}</span>
                 </div>
               </div>

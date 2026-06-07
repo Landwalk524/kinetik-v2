@@ -3,16 +3,20 @@ import { useNavigate } from 'react-router-dom';
 
 export default function AnimeCard({ anime }) {
   const navigate = useNavigate();
-  // anime.id is always the MAL ID (set in normalizeAnime / Jikan direct)
-  const id = anime.mal_id || anime.id;
+
+  // Always route with MAL ID (idMal from AniList, or mal_id from Jikan)
+  const malId = anime.idMal || anime.mal_id;
   const cover = anime.coverImage?.large || anime.coverImage?.medium || '';
   const title = anime.title?.english || anime.title?.romaji || anime.title || '';
   const eps = anime.episodes;
+  const score = anime.averageScore ? (anime.averageScore / 10).toFixed(1) : anime.score || null;
   const format = anime.format || 'TV';
+
+  if (!malId) return null; // skip anime without a MAL ID
 
   return (
     <div
-      onClick={() => navigate(`/anime/${id}`)}
+      onClick={() => navigate(`/anime/${malId}`)}
       className="cursor-pointer group relative rounded-lg overflow-hidden bg-[#111d2b] hover:ring-1 hover:ring-blue-500 transition-all duration-200"
     >
       <div className="relative">
@@ -30,9 +34,9 @@ export default function AnimeCard({ anime }) {
             {eps} ep{eps !== 1 ? 's' : ''}
           </span>
         )}
-        {anime.score && (
+        {score && (
           <span className="absolute bottom-1.5 left-1.5 bg-yellow-500/80 text-black text-[10px] px-1.5 py-0.5 rounded font-bold">
-            ★ {anime.score}
+            ★ {score}
           </span>
         )}
       </div>

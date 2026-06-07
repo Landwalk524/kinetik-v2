@@ -3,13 +3,16 @@ import { useNavigate } from 'react-router-dom';
 
 export default function AnimeListRow({ anime }) {
   const navigate = useNavigate();
+  const malId = anime.idMal || anime.mal_id;
   const ep = anime.nextAiringEpisode?.episode
     ? anime.nextAiringEpisode.episode - 1
     : anime.episodes;
 
+  if (!malId) return null;
+
   return (
     <div
-      onClick={() => navigate(`/anime/${anime.id}`)}
+      onClick={() => navigate(`/anime/${malId}`)}
       className="flex items-center gap-3 py-2 cursor-pointer hover:bg-white/5 rounded px-2 transition-colors group"
     >
       <img
@@ -22,7 +25,7 @@ export default function AnimeListRow({ anime }) {
           {anime.title?.english || anime.title?.romaji}
         </p>
         <div className="flex gap-2 mt-1 flex-wrap">
-          {ep && <span className="text-[10px] text-gray-500">CC {ep}</span>}
+          {ep && <span className="text-[10px] text-gray-500">EP {ep}</span>}
           <span className="text-[10px] text-gray-500">{anime.format || 'TV'}</span>
         </div>
       </div>
