@@ -2,82 +2,78 @@ import React, { useState, useEffect } from 'react';
 
 /**
  * EpisodeServers
- *
  * Props:
  *   malId   — MyAnimeList numeric ID
  *   episode — episode number (1-based)
- *   slug    — gogoanime-style slug (e.g. "naruto")
+ *   slug    — gogoanime-style slug (unused currently, kept for future)
  */
-export default function EpisodeServers({ malId, episode, slug }) {
-  // Build server list — ordered by reliability (most stable first)
-  const buildServers = (malId, episode, slug) => ({
-    SUB: [
-      {
-        name: 'Server 1',
-        // s3taku: no x-frame-options, uses gogoanime slug-based IDs
-        getUrl: () => `https://s3taku.com/streaming.php?id=${slug}-episode-${episode}&title=${encodeURIComponent(slug)}&typesub=SUB`,
-      },
-      {
-        name: 'Server 2',
-        // 2anime embed with MAL ID
-        getUrl: () => `https://2anime.xyz/embed/${malId}/${episode}`,
-      },
-      {
-        name: 'Server 3',
-        // 9anime-style embed
-        getUrl: () => `https://9anime.pl/embed/${malId}/${episode}`,
-      },
-      {
-        name: 'Server 4',
-        // anime3rb embed
-        getUrl: () => `https://anime3rb.com/watch/${slug}-episode-${episode}`,
-      },
-    ],
-    DUB: [
-      {
-        name: 'Server 1',
-        getUrl: () => `https://s3taku.com/streaming.php?id=${slug}-dub-episode-${episode}&title=${encodeURIComponent(slug)}&typesub=DUB`,
-      },
-      {
-        name: 'Server 2',
-        getUrl: () => `https://2anime.xyz/embed/${malId}/${episode}?dub=1`,
-      },
-    ],
-  });
 
+const buildServers = (malId, episode) => ({
+  SUB: [
+    {
+      name: 'VidLink',
+      // VidLink: /anime/{MAL_ID}/{episode}/{sub|dub} — confirmed working, no x-frame-options
+      url: `https://vidlink.pro/anime/${malId}/${episode}/sub`,
+    },
+    {
+      name: 'Server 2',
+      // 2embed with anime-specific path
+      url: `https://www.2embed.cc/embedanime/${malId}/${episode}`,
+    },
+    {
+      name: 'Server 3',
+      // embed.su anime path
+      url: `https://embed.su/embed/anime/${malId}/${episode}`,
+    },
+    {
+      name: 'Server 4',
+      // vidsrc.xyz anime
+      url: `https://vidsrc.xyz/embed/anime/mal/${malId}/${episode}/1`,
+    },
+  ],
+  DUB: [
+    {
+      name: 'VidLink',
+      url: `https://vidlink.pro/anime/${malId}/${episode}/dub`,
+    },
+    {
+      name: 'Server 2',
+      url: `https://www.2embed.cc/embedanime/${malId}/${episode}?dub=1`,
+    },
+  ],
+});
+
+export default function EpisodeServers({ malId, episode, slug }) {
   const [activeType, setActiveType] = useState('SUB');
   const [activeServer, setActiveServer] = useState(0);
   const [iframeKey, setIframeKey] = useState(0);
-  const [loadError, setLoadError] = useState(false);
 
-  const SERVERS = buildServers(malId, episode, slug);
+  const SERVERS = buildServers(malId, episode);
 
+  // Reset to Server 1 / SUB whenever episode or anime changes
   useEffect(() => {
     setActiveType('SUB');
     setActiveServer(0);
     setIframeKey((k) => k + 1);
-    setLoadError(false);
   }, [episode, malId]);
 
+  // Refresh iframe when server changes
   useEffect(() => {
-    setLoadError(false);
     setIframeKey((k) => k + 1);
   }, [activeType, activeServer]);
 
-  const servers = SERVERS[activeType];
-  const currentUrl = servers[activeServer].getUrl();
+  const currentUrl = SERVERS[activeType][activeServer].url;
 
   function tryNext() {
+    const servers = SERVERS[activeType];
     const nextIdx = activeServer + 1;
     if (nextIdx < servers.length) {
       setActiveServer(nextIdx);
     } else {
-      // switch type and reset
       const otherType = activeType === 'SUB' ? 'DUB' : 'SUB';
       setActiveType(otherType);
       setActiveServer(0);
     }
-    setLoadError(false);
   }
 
   return (
@@ -90,32 +86,29 @@ export default function EpisodeServers({ malId, episode, slug }) {
         <iframe
           key={`${iframeKey}-${currentUrl}`}
           src={currentUrl}
-          style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', border: 'none' }}
+          style={{
+            position: 'absolute',
+            inset: 0,
+            width: '100%',
+            height: '100%',
+            border: 'none',
+          }}
           allowFullScreen
           allow="autoplay; fullscreen; picture-in-picture; encrypted-media"
           referrerPolicy="no-referrer-when-downgrade"
-          onError={() => setLoadError(true)}
         />
-
-        {/* Error overlay */}
-        {loadError && (
-          <div className="absolute inset-0 flex flex-col items-center justify-center bg-[#0a1220] gap-4 z-10">
-            <span className="text-5xl">⚠️</span>
-            <p className="text-white font-semibold text-sm">This server isn't loading.</p>
-            <button
-              onClick={tryNext}
-              className="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm rounded-lg font-medium transition-colors"
-            >
-              Try Next Server →
-            </button>
-          </div>
-        )}
       </div>
 
       {/* Hint */}
       <div className="mt-2 flex items-center gap-2 text-yellow-400/70 text-xs px-1">
         <span>⚡</span>
-        <span>If the player is blank or shows an error, click a different server below.</span>
+        <span>If the player is blank, try a different server below.</span>
+        <button
+          onClick={tryNext}
+          className="ml-auto px-3 py-1 bg-[#1a2535] hover:bg-blue-700 text-gray-300 hover:text-white text-xs rounded-lg transition-colors"
+        >
+          Try Next →
+        </button>
       </div>
 
       {/* Server selector */}
